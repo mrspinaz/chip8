@@ -105,6 +105,13 @@ class Screen
             throw std::runtime_error(SDL_GetError());
         }
 
+        SDL_SetRenderScale(renderer, 14, 14);
+        SDL_SetRenderDrawColor(renderer,0,0,0,255);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderDrawColor(renderer,255,255,255,255);
+        texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, 64, 32);
+        SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
+
         mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
         if (!mixer)
         {
@@ -126,10 +133,8 @@ class Screen
         MIX_SetTrackAudio(track, audio);
         sound_on = false;
         
-        SDL_SetRenderScale(renderer, 14, 14);
-        SDL_SetRenderDrawColor(renderer,0,0,0,255);
-        SDL_RenderClear(renderer);
-        SDL_SetRenderDrawColor(renderer,255,255,255,255);
+
+
         keys = SDL_GetKeyboardState(nullptr);
         
     }
@@ -141,8 +146,7 @@ class Screen
     void draw_texture()
     {
         // takes pixel array from chip8 and renders to screan
-        texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, 64, 32);
-        SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
+
         SDL_UpdateTexture( texture , NULL, display.data(), 64 * sizeof (uint32_t));
         SDL_RenderTexture(renderer, texture, NULL, NULL);
         SDL_RenderPresent(renderer);
@@ -214,7 +218,7 @@ class Chip8
     std::vector<void(Chip8::*)()> decoder_tableF; // "                            "
 
     public:
-    Chip8() : memory(4096), reg(16), display(32 * 64, 0), input(16), 
+    Chip8() : memory(4096), reg(16), display(32 * 64, 0xFF000000), input(16),
               decoder_table(0xF + 0x1), decoder_table0(0xE + 0x1), decoder_table8(0xE + 0x1), decoder_tableE(0xE + 0x1), decoder_tableF(0x65 + 0x1), 
               stack(), 
               rng(std::time({})), dis(0, 255),
@@ -238,8 +242,8 @@ class Chip8
         decoder_table[0xC] = &Chip8::OP_CXKK;
         decoder_table[0xD] = &Chip8::OP_DXYN;
 
-        decoder_table0[0x0] = &Chip8::OP_00E0;
-        decoder_table0[0xE] = &Chip8::OP_00EE;
+        decoder_table0[0x00] = &Chip8::OP_00E0;
+        decoder_table0[0x0E] = &Chip8::OP_00EE;
 
         decoder_table8[0x0] = &Chip8::OP_8XY0;
         decoder_table8[0x1] = &Chip8::OP_8XY1;
@@ -332,7 +336,10 @@ class Chip8
         pc +=2; // increment by 2 as each instruction is 2 bytes
         decode();
         execute();
-
+        if(input[0])
+        {
+            std::cout << "somethign pressed" <<std::endl;
+        }
         //update timers
         if(delay_timer > 0){
             --delay_timer;
@@ -347,7 +354,7 @@ class Chip8
     void OP_00E0()
     {
         // clear screen
-        std::fill(display.begin(), display.end(), 0); 
+        std::fill(display.begin(), display.end(), 0xFF000000);
     }
     void OP_00EE()
     {
@@ -573,11 +580,16 @@ class Chip8
                 pixel = pixel_byte & (0b10000000 >> col); 
                 if(pixel)
                 {
-                    if (display[64*(row + ycoord) + (col + xcoord)] == 0xFFFFFFFF)
+                    uint32_t& px = display[64*(row + ycoord) + (col + xcoord)];
+                    if (px == 0xFFFFFFFF)
                     {
                         reg[0xF] = 1;
+                        px = 0xFF000000;
                     }
-                    display[64*(row + ycoord) + (col + xcoord)] ^= 0xFFFFFFFF; // XOR 
+                    else
+                    {
+                        px = 0xFFFFFFFF;
+                    }
                 }
             }
         }
@@ -695,7 +707,7 @@ int main(int argc, char** args)
     Chip8 test_chip;
     Screen test_screen(test_chip.get_display(), test_chip.get_input(), test_chip.get_sound_timer()); // connect chip8 to screen
 
-    test_chip.load_ROM("ROMs/test_opcode.ch8");
+    test_chip.load_ROM("ROMs/Airplane.ch8");
 
     bool quit = false;
     while(!quit)
@@ -705,7 +717,7 @@ int main(int argc, char** args)
         test_screen.update_inputs();
         test_screen.update_audio();
         quit = test_screen.get_esc_state();
-        SDL_Delay(17);
+        SDL_Delay(2);
     }
 
 	return 0;
