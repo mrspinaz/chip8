@@ -336,7 +336,7 @@ class Chip8
         pc +=2; // increment by 2 as each instruction is 2 bytes
         decode();
         execute();
-        if(input[0])
+        if(input[2])
         {
             std::cout << "somethign pressed" <<std::endl;
         }
@@ -394,10 +394,10 @@ class Chip8
     }
     void OP_5XY0()
     {
-        // skip one instruction if X == Y
-        uint8_t valX = (opcode >> 8) & 0x000F;
-        uint8_t valY = (opcode >> 4) & 0x000F;
-        if(valX == valY)
+        // skip one instruction if VX == VY
+        uint8_t indX = (opcode >> 8) & 0x000F;
+        uint8_t indY = (opcode >> 4) & 0x000F;
+        if(reg[indX] == reg[indY])
         {
             pc +=2;
         }
@@ -515,10 +515,10 @@ class Chip8
     }  
     void OP_9XY0()
     {
-        // skip one instruction if X != Y
-        uint8_t valX = (opcode >> 8) & 0x000F;
-        uint8_t valY = (opcode >> 4) & 0x000F;
-        if(valX != valY)
+        // skip one instruction if VX != VY
+        uint8_t indX = (opcode >> 8) & 0x000F;
+        uint8_t indY = (opcode >> 4) & 0x000F;
+        if(reg[indX] != reg[indY])
         {
             pc +=2;
         }
@@ -597,20 +597,20 @@ class Chip8
     void OP_EX9E()
     {
         // Skip next instruction if key with the value of Vx is pressed.
-        uint8_t keynum = (opcode >> 8) & 0x000F;
-        if(input[keynum] == 1)
+        uint8_t ind = (opcode >> 8) & 0x000F;
+        if(input[reg[ind]] == 1)
         {
             pc += 2;
-        } 
+        }
     }
     void OP_EXA1()
     {
         // Skip next instruction if key with the value of Vx is NOT pressed.
-        uint8_t keynum = (opcode >> 8) & 0x000F;
-        if(input[keynum] == 0)
+        uint8_t ind = (opcode >> 8) & 0x000F;
+        if(input[reg[ind]] == 0)
         {
             pc += 2;
-        } 
+        }
     }
     void OP_FX07()
     {
@@ -707,7 +707,7 @@ int main(int argc, char** args)
     Chip8 test_chip;
     Screen test_screen(test_chip.get_display(), test_chip.get_input(), test_chip.get_sound_timer()); // connect chip8 to screen
 
-    test_chip.load_ROM("ROMs/Airplane.ch8");
+    test_chip.load_ROM("ROMs/Chip8 emulator Logo [Garstyciuks].ch8");
 
     bool quit = false;
     while(!quit)
