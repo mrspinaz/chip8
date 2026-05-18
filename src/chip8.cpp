@@ -33,7 +33,7 @@ const uint16_t FONT_START_ADDRESS = 0X50;
 class Stack
 {
     std::vector<uint16_t> stk;
-    int8_t top = -1;
+    int8_t top = -1; // top is a signed 8bit
     public:
     Stack() : stk(16) {}
     void push(uint16_t val)
@@ -49,7 +49,7 @@ class Stack
 
     uint16_t pop()
     {
-        if (top == 255)
+        if (top < 0) // underflow check
         {
             std::cout << "chip8 stack underflow" << std::endl;
             return 0;
@@ -178,7 +178,7 @@ class Screen
             MIX_PlayTrack(track, 0);
             sound_on = true;
         }
-        else
+        else if(sound_timer == 0 && sound_on == true)
         {
             MIX_PauseTrack(track);
             sound_on = false;
@@ -204,6 +204,7 @@ class Chip8
     uint8_t delay_timer;
     uint8_t sound_timer;
     uint16_t opcode;
+    uint8_t draw_flag; //set true to redraw screen.
 
     // random number seed as current time
     std::mt19937 rng;
@@ -220,9 +221,9 @@ class Chip8
     public:
     Chip8() : memory(4096), reg(16), display(32 * 64, 0xFF000000), input(16),
               decoder_table(0xF + 0x1), decoder_table0(0xE + 0x1), decoder_table8(0xE + 0x1), decoder_tableE(0xE + 0x1), decoder_tableF(0x65 + 0x1), 
-              stack(), 
+              stack(),  
               rng(std::time({})), dis(0, 255),
-              sound_timer(0), delay_timer(0)
+              sound_timer(0), delay_timer(0), draw_flag(0)
     {
         pc = PROGRAM_START_ADDRESS;
         std::copy(font.begin(), font.end(), memory.begin() + FONT_START_ADDRESS);
@@ -336,17 +337,6 @@ class Chip8
         pc +=2; // increment by 2 as each instruction is 2 bytes
         decode();
         execute();
-        if(input[2])
-        {
-            std::cout << "somethign pressed" <<std::endl;
-        }
-        //update timers
-        if(delay_timer > 0){
-            --delay_timer;
-        }
-        if(sound_timer > 0){
-            --sound_timer;
-        }
     }
     // ============= OPCODE FUNCS ===================
     void OP_NULL()
@@ -355,6 +345,7 @@ class Chip8
     {
         // clear screen
         std::fill(display.begin(), display.end(), 0xFF000000);
+        draw_flag = 1;
     }
     void OP_00EE()
     {
@@ -447,7 +438,16 @@ class Chip8
         // VX set to value VX+XY
         uint8_t indX = (opcode >> 8) & 0x000F;
         uint8_t indY = (opcode >> 4) & 0x000F;
-        reg[indX] += reg[indY]; 
+        uint16_t sum = reg[indX] + reg[indY];
+        reg[indX] += reg[indY];
+        if(sum > 0xFF)
+        {
+            reg[0xF] = 1;
+        } 
+        else
+        {
+            reg[0xF] = 0;
+        }
     }
     void OP_8XY5()
     {
@@ -481,7 +481,7 @@ class Chip8
         }
         else
         {
-            reg[0xF] = 1;
+            reg[0xF] = 0;
         }
 
     }
@@ -511,6 +511,14 @@ class Chip8
         reg[indX] = reg[indY]; // this step is skipped in later super-chip and chip-48. Make separate optional OPfunc without it
         outshited_bit = (reg[indX] >> 7) & 0x0001;
         reg[indX] = reg[indX] << 1;
+        if(outshited_bit)
+        {
+            reg[0xF] = 1;
+        }
+        else
+        {
+            reg[0xF] = 0;
+        }
 
     }  
     void OP_9XY0()
@@ -530,7 +538,7 @@ class Chip8
     }
     void OP_BNNN()
     {
-        pc = opcode & 0x0FFF + reg[0];
+        pc = (opcode & 0x0FFF) + reg[0];
     }
     void OP_CXKK()
     {   
@@ -593,6 +601,7 @@ class Chip8
                 }
             }
         }
+        draw_flag = 1;
     }
     void OP_EX9E()
     {
@@ -687,6 +696,17 @@ class Chip8
             reg[i] = memory[indreg+i];
         }
     }
+    void update_timers()
+    {
+        if(sound_timer > 0)
+        {
+            sound_timer--;
+        }
+        if(delay_timer > 0)
+        {
+            delay_timer--;
+        }
+    }
     std::vector<uint32_t>& get_display()
     {
         return display;
@@ -699,25 +719,56 @@ class Chip8
     {
         return sound_timer;
     }
+    uint8_t& get_draw_flag()
+    {
+        return draw_flag;
+    }
+    void set_draw_flag(uint8_t inp)
+    {
+        draw_flag = inp;
+    }
 };
 
 int main(int argc, char** args)
-{
+{   
+
+    const int CPU_HZ = 600; // should be able to change this. CPU clock speed.
+    const int SCREEN_FPS = 60;
+    const int MSPF = 1000 / SCREEN_FPS; // milliseconds per frame. 60 FPS hardcoded.
+    const int CYCLES_PER_SCREEN_REFRESH = CPU_HZ / SCREEN_FPS;
 
     Chip8 test_chip;
     Screen test_screen(test_chip.get_display(), test_chip.get_input(), test_chip.get_sound_timer()); // connect chip8 to screen
 
-    test_chip.load_ROM("ROMs/Chip8 emulator Logo [Garstyciuks].ch8");
-
+    test_chip.load_ROM("ROMs/Astro Dodge [Revival Studios, 2008].ch8");
+    std::cout << "testing" << std::endl;
     bool quit = false;
     while(!quit)
-    {
-        test_chip.CPU_cycle();
+    {   
+        uint64_t loop_st = SDL_GetTicks();
+
+        for(int i = 0; i < CYCLES_PER_SCREEN_REFRESH; i++)
+        {
+            test_chip.CPU_cycle();
+        }
+        
+        if(test_chip.get_draw_flag())
+        {
+            
+            test_chip.set_draw_flag(0);
+        }
+
         test_screen.draw_texture();
+        test_chip.update_timers();
         test_screen.update_inputs();
         test_screen.update_audio();
         quit = test_screen.get_esc_state();
-        SDL_Delay(2);
+
+        uint64_t elapsed = SDL_GetTicks() - loop_st;
+        if(elapsed < MSPF)
+        {
+            SDL_Delay(MSPF - elapsed); // delay for the remaining time such that while loop executes once per ~16 ms
+        } 
     }
 
 	return 0;
