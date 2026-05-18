@@ -11,5 +11,9 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
 add_subdirectory(vendored/SDL EXCLUDE_FROM_ALL)
 add_subdirectory(vendored/SDL_mixer EXCLUDE_FROM_ALL)
 
-add_executable(chip8 src/chip8.cpp)
+add_executable(chip8
+    src/main.cpp
+    src/Chip8.cpp
+    src/Screen.cpp
+)
 target_link_libraries(chip8 PRIVATE SDL3_mixer::SDL3_mixer SDL3::SDL3)
