@@ -13,6 +13,7 @@ class Stack
     void push(uint16_t val);
     uint16_t pop();
     uint8_t get_top();
+    void set_top(int8_t val);
 };
 
 class Chip8
@@ -27,7 +28,6 @@ class Chip8
     uint8_t delay_timer;
     uint8_t sound_timer;
     uint16_t opcode;
-    uint8_t draw_flag; //set true to redraw screen.
 
     // random number seed as current time
     std::mt19937 rng;
@@ -44,6 +44,7 @@ class Chip8
     public:
     Chip8();
 
+    void reset();
     void load_ROM(const char* filename);
     void fetch();
     void decode();

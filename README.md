@@ -1,7 +1,7 @@
 TODO:
 OpenGL for CRT effects
-Fix slow refreshing (implement draw flag)
 superchip8 instruction set.
-decouple delay/sound timers from CPU cycle timer.
+null functions in decoder table
 
 Finished:
+decouple delay/sound timers from CPU cycle timer.

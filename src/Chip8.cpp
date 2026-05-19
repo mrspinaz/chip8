@@ -29,10 +29,13 @@ uint16_t Stack::pop()
     }
     return stk[top--];
 }
-
 uint8_t Stack::get_top()
 {
     return top;
+}
+void Stack::set_top(int8_t val)
+{
+    top = val;
 }
 
 // ===================== Chip8 =====================
@@ -87,7 +90,20 @@ Chip8::Chip8() : memory(4096), reg(16), display(32 * 64, 0xFF000000), input(16),
     decoder_tableF[0x55] = &Chip8::OP_FX55;
     decoder_tableF[0x65] = &Chip8::OP_FX65;
 }
+void Chip8::reset()
+{
+    // reset the chip to load a new ROM
+    indreg = 0;
+    pc = PROGRAM_START_ADDRESS;
+    delay_timer = 0;
+    sound_timer = 0;
 
+    stack.set_top(-1);
+    std::fill(reg.begin(), reg.end(), 0);
+    std::fill(memory.begin(), memory.end(), 0);
+    std::copy(font.begin(), font.end(), memory.begin() + FONT_START_ADDRESS); // reload sprites to memory
+
+}
 void Chip8::load_ROM(const char* filename)
 {
     std::ifstream file(filename, std::ios::binary);
@@ -156,10 +172,6 @@ void Chip8::CPU_cycle()
     pc +=2; // increment by 2 as each instruction is 2 bytes
     decode();
     execute();
-    if(input[2])
-    {
-        std::cout << "somethign pressed" <<std::endl;
-    }
 }
 
 // ============= OPCODE FUNCS ===================
@@ -170,7 +182,6 @@ void Chip8::OP_00E0()
 {
     // clear screen
     std::fill(display.begin(), display.end(), 0xFF000000);
-    draw_flag = 1;
 }
 
 void Chip8::OP_00EE()
@@ -446,7 +457,6 @@ void Chip8::OP_DXYN()
             }
         }
     }
-    draw_flag = 1;
 }
 
 void Chip8::OP_EX9E()
