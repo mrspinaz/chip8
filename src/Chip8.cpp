@@ -29,10 +29,12 @@ uint16_t Stack::pop()
     }
     return stk[top--];
 }
+
 uint8_t Stack::get_top()
 {
     return top;
 }
+
 void Stack::set_top(int8_t val)
 {
     top = val;
@@ -40,7 +42,7 @@ void Stack::set_top(int8_t val)
 
 // ===================== Chip8 =====================
 
-Chip8::Chip8() : memory(4096), reg(16), display(32 * 64, 0xFF000000), input(16),
+Chip8::Chip8() : memory(4096), reg(16), display(64 * 32, 0), input(16),
           decoder_table(0xF + 0x1), decoder_table0(0xE + 0x1), decoder_table8(0xE + 0x1), decoder_tableE(0xE + 0x1), decoder_tableF(0x65 + 0x1),
           stack(),
           rng(std::time({})), dis(0, 255),
@@ -49,8 +51,14 @@ Chip8::Chip8() : memory(4096), reg(16), display(32 * 64, 0xFF000000), input(16),
     pc = PROGRAM_START_ADDRESS;
     std::copy(font.begin(), font.end(), memory.begin() + FONT_START_ADDRESS);
 
+
     // setup decoder table
-    decoder_table[0x0] = &Chip8::OP_NULL;
+    std::fill(decoder_table.begin(), decoder_table.end(), &Chip8::OP_NULL);
+    std::fill(decoder_table0.begin(), decoder_table0.end(), &Chip8::OP_NULL);
+    std::fill(decoder_table8.begin(), decoder_table8.end(), &Chip8::OP_NULL);
+    std::fill(decoder_tableE.begin(), decoder_tableE.end(), &Chip8::OP_NULL);
+    std::fill(decoder_tableF.begin(), decoder_tableF.end(), &Chip8::OP_NULL);
+
     decoder_table[0x1] = &Chip8::OP_1NNN;
     decoder_table[0x2] = &Chip8::OP_2NNN;
     decoder_table[0x3] = &Chip8::OP_3XNN;
@@ -89,6 +97,8 @@ Chip8::Chip8() : memory(4096), reg(16), display(32 * 64, 0xFF000000), input(16),
     decoder_tableF[0x33] = &Chip8::OP_FX33;
     decoder_tableF[0x55] = &Chip8::OP_FX55;
     decoder_tableF[0x65] = &Chip8::OP_FX65;
+
+
 }
 void Chip8::reset()
 {
@@ -102,6 +112,9 @@ void Chip8::reset()
     std::fill(reg.begin(), reg.end(), 0);
     std::fill(memory.begin(), memory.end(), 0);
     std::copy(font.begin(), font.end(), memory.begin() + FONT_START_ADDRESS); // reload sprites to memory
+
+    //reset screen
+    OP_00E0();
 
 }
 void Chip8::load_ROM(const char* filename)
@@ -181,7 +194,7 @@ void Chip8::OP_NULL()
 void Chip8::OP_00E0()
 {
     // clear screen
-    std::fill(display.begin(), display.end(), 0xFF000000);
+    std::fill(display.begin(), display.end(), 0);
 }
 
 void Chip8::OP_00EE()
@@ -444,15 +457,15 @@ void Chip8::OP_DXYN()
             pixel = pixel_byte & (0b10000000 >> col);
             if(pixel)
             {
-                uint32_t& px = display[64*(row + ycoord) + (col + xcoord)];
-                if (px == 0xFFFFFFFF)
+                uint8_t& px = display[64*(row + ycoord) + (col + xcoord)];
+                if (px == 0x01)
                 {
                     reg[0xF] = 1;
-                    px = 0xFF000000;
+                    px = 0x00;
                 }
                 else
                 {
-                    px = 0xFFFFFFFF;
+                    px = 0x01;
                 }
             }
         }
@@ -569,7 +582,7 @@ void Chip8::update_timers()
         delay_timer--;
     }
 }
-std::vector<uint32_t>& Chip8::get_display()
+std::vector<uint8_t>& Chip8::get_display()
 {
     return display;
 }
@@ -578,8 +591,15 @@ std::vector<uint8_t>& Chip8::get_input()
 {
     return input;
 }
-
 uint8_t& Chip8::get_sound_timer()
 {
     return sound_timer;
+}
+std::vector<uint8_t>* Chip8::get_reg_ptr()
+{
+    return &reg;
+}
+std::vector<uint8_t>* Chip8::get_mem_ptr()
+{
+    return &memory;
 }

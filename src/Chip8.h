@@ -20,7 +20,7 @@ class Chip8
 {
     std::vector<uint8_t> memory; // RAM
     std::vector<uint8_t> reg; // reg named VX in some implementations
-    std::vector<uint32_t> display; // display screen
+    std::vector<uint8_t> display; // display screen
     Stack stack; // to keep track of order of execution
     uint16_t indreg; // special 16-bit register for use in operations
     uint16_t pc; // program counter
@@ -88,8 +88,14 @@ class Chip8
     void OP_FX55();
     void OP_FX65();
 
+    // interfacing with device
     void update_timers();
-    std::vector<uint32_t>& get_display();
+    std::vector<uint8_t>& get_display();
     std::vector<uint8_t>& get_input();
     uint8_t& get_sound_timer();
+
+    // exposing internals 
+    std::vector<uint8_t>* get_reg_ptr();
+    std::vector<uint8_t>* get_mem_ptr();
+    
 };
