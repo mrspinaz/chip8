@@ -29,6 +29,12 @@ class Device
     int tot_num_lines; // Hardcoded to 256, displaying 16 bytes per line, 4096 bytes total in memory.
     std::vector<std::string> text_lines;
 
+    //disassembly display
+    std::vector<std::string> dis_text_lines;
+    int max_lines;
+    int head; //head of display, updated each iter.
+    int lines_filled; //tracks how many entries are in dis_text_lines;
+
     //16-Seg Display
     Image seg_full_image; // Image atlas
     Texture2D seg_full_texture; // Texture atlas
@@ -44,18 +50,20 @@ class Device
     Texture2D glass_texture;
 
     //chip8 internals pointers
-    std::vector<uint8_t>* reg_ptr; // pointer to reg
-    std::vector<uint8_t>* memory_ptr; // pointer to memory
+    std::vector<uint8_t>* reg_ptr; // pointer to reg for 16-seg display
+    std::vector<uint8_t>* memory_ptr; // pointer to memory for memory display
+    std::stringstream* instruction_ptr; // pointer to instruction_ss for disassembly display
 
     private:
     void _fetch_memory_lines(std::vector<uint8_t>* mem_ptr, std::vector<std::string>& text_lines, int disp_range_start, int text_disp_range);
+    void _update_dissasembly_lines();
 
     public:
     Device(std::vector<uint8_t>& draw_buffer_in, std::vector<uint8_t>& inputs_in);
     ~Device();
     void update_screen();
     void update_inputs();  
-    void set_chip8_internals(std::vector<uint8_t>* reg_ptr_in, std::vector<uint8_t>* memory_in);
+    void set_chip8_internals(std::vector<uint8_t>* reg_ptr_in, std::vector<uint8_t>* memory_in, std::stringstream* instruction_in);
 };
 
 /*

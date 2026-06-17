@@ -4,6 +4,9 @@
 #include <iostream>
 #include <fstream>
 #include <ctime>
+#include <string>
+#include <sstream>
+#include <iomanip>
 
 // ===================== Stack =====================
 
@@ -181,10 +184,17 @@ void Chip8::execute()
 
 void Chip8::CPU_cycle()
 {
+    // clear instruction string
+    instruction_ss.str("");
+    instruction_ss.clear();
+    instruction_ss << std::uppercase;
+
     fetch();
     pc +=2; // increment by 2 as each instruction is 2 bytes
     decode();
     execute();
+
+
 }
 
 // ============= OPCODE FUNCS ===================
@@ -195,25 +205,33 @@ void Chip8::OP_00E0()
 {
     // clear screen
     std::fill(display.begin(), display.end(), 0);
+
+    instruction_ss << "CLS";
 }
 
 void Chip8::OP_00EE()
 {
-    // set program counter to address at to of stack, then subtract 1 from stack pointer.
+    // set program counter to address at top of stack, then subtract 1 from stack pointer.
     // used to return from a subroutine, used in tandem with 2NNN
     pc = stack.pop();
+    
+    instruction_ss << "RET";
 }
 
 void Chip8::OP_1NNN()
 {
     // jump
     pc =  opcode & 0x0FFF;
+
+    instruction_ss << "JP " << "0x" << std::hex << std::setfill('0') << std::setw(4) << +pc;
 }
 
 void Chip8::OP_2NNN(){
     // call subroutine at memory location NNN
     stack.push(pc); // store current pc in stack so subroutine can return later
     pc = opcode & 0x0FFF;
+
+    instruction_ss << "CALL "<< "0x" << std::hex << std::setfill('0') << std::setw(4) << +pc;
 }
 
 void Chip8::OP_3XNN()
@@ -225,6 +243,7 @@ void Chip8::OP_3XNN()
     {
         pc +=2;
     }
+    instruction_ss << "SE V" << +ind << ", 0x" << std::hex << std::setfill('0') << std::setw(2) << +val; 
 }
 
 void Chip8::OP_4XNN()
@@ -236,6 +255,7 @@ void Chip8::OP_4XNN()
     {
         pc +=2;
     }
+    instruction_ss << "SNE V" << +ind << ", 0x" << std::hex << std::setfill('0') << std::setw(2) << +val; 
 }
 
 void Chip8::OP_5XY0()
@@ -247,13 +267,17 @@ void Chip8::OP_5XY0()
     {
         pc +=2;
     }
+    instruction_ss << "SE " << " V" << +indX << ", V" << +indY;
 }
 
 void Chip8::OP_6XNN()
 {
     // set reg X to NN
     uint8_t ind = (opcode >> 8) & 0x000F;
-    reg[ind] = opcode & 0x00FF;
+    uint8_t val = opcode & 0x00FF;
+    reg[ind] = val;
+
+    instruction_ss << "LD " << "V" << +ind << ", 0x" << std::hex << std::setfill('0') << std::setw(2) << +val; 
 }
 
 void Chip8::OP_7XNN()
@@ -261,6 +285,7 @@ void Chip8::OP_7XNN()
     // add value NN to reg X
     uint8_t ind = (opcode >> 8) & 0x000F;
     reg[ind] = reg[ind] + (opcode & 0x00FF);
+    instruction_ss << "ADD V" << +ind << ", 0x" << std::hex << std::setfill('0') << std::setw(2) << +(opcode & 0x00FF);
 }
 
 void Chip8::OP_8XY0()
@@ -269,6 +294,8 @@ void Chip8::OP_8XY0()
     uint8_t indX = (opcode >> 8) & 0x000F;
     uint8_t indY = (opcode >> 4) & 0x000F;
     reg[indX] = reg[indY];
+    instruction_ss << "LD " << " V" << +indX << ", V" << +indY;
+
 }
 
 void Chip8::OP_8XY1()
@@ -277,6 +304,8 @@ void Chip8::OP_8XY1()
     uint8_t indX = (opcode >> 8) & 0x000F;
     uint8_t indY = (opcode >> 4) & 0x000F;
     reg[indX] |= reg[indY];
+    instruction_ss << "OR " << " V" << +indX << ", V" << +indY;
+
 }
 
 void Chip8::OP_8XY2()
@@ -285,6 +314,7 @@ void Chip8::OP_8XY2()
     uint8_t indX = (opcode >> 8) & 0x000F;
     uint8_t indY = (opcode >> 4) & 0x000F;
     reg[indX] &= reg[indY];
+    instruction_ss << "AND " << " V" << +indX << ", V" << +indY;
 }
 
 void Chip8::OP_8XY3()
@@ -293,6 +323,7 @@ void Chip8::OP_8XY3()
     uint8_t indX = (opcode >> 8) & 0x000F;
     uint8_t indY = (opcode >> 4) & 0x000F;
     reg[indX] ^= reg[indY];
+    instruction_ss << "XOR " << " V" << +indX << ", V" << +indY;
 }
 
 void Chip8::OP_8XY4()
@@ -310,6 +341,7 @@ void Chip8::OP_8XY4()
     {
         reg[0xF] = 0;
     }
+    instruction_ss << "ADD " << " V" << +indX << ", V" << +indY;
 }
 
 void Chip8::OP_8XY5()
@@ -326,6 +358,7 @@ void Chip8::OP_8XY5()
         reg[0xF] = 0;
     }
     reg[indX] -= reg[indY];
+    instruction_ss << "SUB " << " V" << +indX << ", V" << +indY;
 }
 
 void Chip8::OP_8XY6()
@@ -347,6 +380,7 @@ void Chip8::OP_8XY6()
     {
         reg[0xF] = 0;
     }
+    instruction_ss << "SHR " << " V" << +indX << " {, V" << +indY << "}";
 }
 
 void Chip8::OP_8XY7()
@@ -363,6 +397,7 @@ void Chip8::OP_8XY7()
         reg[0xF] = 0;
     }
     reg[indX] = reg[indY] - reg[indX];
+    instruction_ss << "SUBN " << " V" << +indX << ", V" << +indY;
 }
 
 void Chip8::OP_8XYE()
@@ -384,6 +419,7 @@ void Chip8::OP_8XYE()
     {
         reg[0xF] = 0;
     }
+    instruction_ss << "SHL " << " V" << +indX << " {, V" << +indY << "}";
 }
 
 void Chip8::OP_9XY0()
@@ -395,17 +431,20 @@ void Chip8::OP_9XY0()
     {
         pc +=2;
     }
+    instruction_ss << "SNE " << " V" << +indX << ", V" << +indY;
 }
 
 void Chip8::OP_ANNN()
 {
     // set index register I to NNN
     indreg = opcode & 0x0FFF;
+    instruction_ss << "LD I, 0x" <<  std::hex << std::setfill('0') << std::setw(4) << +indreg;
 }
 
 void Chip8::OP_BNNN()
-{
+{   
     pc = (opcode & 0x0FFF) + reg[0];
+    instruction_ss << "JP, V0, 0x" <<  std::hex << std::setfill('0') << std::setw(4) << +(opcode & 0x0FFF);
 }
 
 void Chip8::OP_CXKK()
@@ -414,6 +453,7 @@ void Chip8::OP_CXKK()
     uint8_t ind = (opcode >> 8) & 0x000F;
     uint8_t kk = opcode & 0x00FF;
     reg[ind] = dis(rng) & kk;
+    instruction_ss << "RND V" << +ind << ", 0x" << std::hex << std::setfill('0') << std::setw(2) << +kk;
 }
 
 void Chip8::OP_DXYN()
@@ -470,6 +510,7 @@ void Chip8::OP_DXYN()
             }
         }
     }
+    instruction_ss << "DRW V" << +xind << ", V" << +yind << ", 0x" << std::hex << std::setfill('0') << std::setw(1) << +spr_h;
 }
 
 void Chip8::OP_EX9E()
@@ -480,6 +521,7 @@ void Chip8::OP_EX9E()
     {
         pc += 2;
     }
+    instruction_ss << "SKP V" << +ind;
 }
 
 void Chip8::OP_EXA1()
@@ -490,6 +532,8 @@ void Chip8::OP_EXA1()
     {
         pc += 2;
     }
+    instruction_ss << "SKNP V" << +ind;
+
 }
 
 void Chip8::OP_FX07()
@@ -497,6 +541,8 @@ void Chip8::OP_FX07()
     // Set Vx = delay timer value.
     uint8_t ind = (opcode >> 8) & 0x000F;
     reg[ind] = delay_timer;
+
+    instruction_ss << "LD V" << +ind << " DT";
 }
 
 void Chip8::OP_FX0A()
@@ -513,6 +559,7 @@ void Chip8::OP_FX0A()
     }
     // decrement pc to come back to this instruction, as pc increments each CPU cycle .
     pc -= 2;
+    instruction_ss << "LD V" << +ind << " K";
 }
 
 void Chip8::OP_FX15()
@@ -520,6 +567,7 @@ void Chip8::OP_FX15()
     // DT is set equal to the value of Vx
     uint8_t ind = (opcode >> 8) & 0x000F;
     delay_timer = reg[ind];
+    instruction_ss << "LD DT, V" << +ind;
 }
 
 void Chip8::OP_FX18()
@@ -527,6 +575,7 @@ void Chip8::OP_FX18()
     // ST is set equal to the value of Vx.
     uint8_t ind = (opcode >> 8) & 0x000F;
     sound_timer = reg[ind];
+    instruction_ss << "LD ST, V" << +ind;
 }
 
 void Chip8::OP_FX1E()
@@ -534,6 +583,7 @@ void Chip8::OP_FX1E()
     // The values of I and Vx are added, and the results are stored in I
     uint8_t ind = (opcode >> 8) & 0x000F;
     indreg = reg[ind] + indreg;
+    instruction_ss << "ADD I, V" << +ind;
 }
 
 void Chip8::OP_FX29()
@@ -541,6 +591,7 @@ void Chip8::OP_FX29()
     // The value of I is set to the location for the hexadecimal sprite corresponding to the value of Vx.
     uint8_t ind = (opcode >> 8) & 0x000F;
     indreg = FONT_START_ADDRESS + 5*reg[ind];
+    instruction_ss << "LD F, V" << +ind;
 }
 
 void Chip8::OP_FX33()
@@ -551,6 +602,7 @@ void Chip8::OP_FX33()
     memory[indreg] = val / 100; // integer div, decimal discarded
     memory[indreg+1] = (val / 10) % 10;
     memory[indreg+2] = val % 10;
+    instruction_ss << "LD B, V" << +ind;
 }
 
 void Chip8::OP_FX55()
@@ -561,6 +613,7 @@ void Chip8::OP_FX55()
     {
         memory[indreg+i] = reg[i];
     }
+    instruction_ss << "LD [0x" << std::hex << std::setfill('0') << std::setw(4) << +indreg << "], VX";
 }
 void Chip8::OP_FX65()
 {
@@ -570,6 +623,7 @@ void Chip8::OP_FX65()
     {
         reg[i] = memory[indreg+i];
     }
+    instruction_ss << "LD VX, [0x" << std::hex << std::setfill('0') << std::setw(4) << +indreg << "]";
 }
 void Chip8::update_timers()
 {
@@ -602,4 +656,8 @@ std::vector<uint8_t>* Chip8::get_reg_ptr()
 std::vector<uint8_t>* Chip8::get_mem_ptr()
 {
     return &memory;
+}
+std::stringstream* Chip8::get_instruction_ptr()
+{
+    return &instruction_ss;
 }

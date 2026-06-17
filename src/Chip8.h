@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <vector>
 #include <random>
+#include <string>
+#include <sstream>
 
 class Stack
 {
@@ -40,6 +42,9 @@ class Chip8
     std::vector<void(Chip8::*)()> decoder_table8; // "                            "
     std::vector<void(Chip8::*)()> decoder_tableE; // "                            "
     std::vector<void(Chip8::*)()> decoder_tableF; // "                            "
+
+    // for printing current instruction
+    std::stringstream instruction_ss;
 
     public:
     Chip8();
@@ -97,5 +102,6 @@ class Chip8
     // exposing internals 
     std::vector<uint8_t>* get_reg_ptr();
     std::vector<uint8_t>* get_mem_ptr();
+    std::stringstream* get_instruction_ptr();
     
 };

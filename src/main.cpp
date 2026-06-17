@@ -6,8 +6,8 @@
 
 
 
-const int CPU_HZ = 600; //CPU clock speed. Set equal to SCREEN_FPS to sync with screen refresh rate.
-const int SCREEN_FPS = 60;
+const int CPU_HZ = 1; //CPU clock speed. Set equal to SCREEN_FPS to sync with screen refresh rate.
+const int SCREEN_FPS = 1;
 const int MSPF = 1000 / SCREEN_FPS; // milliseconds per frame. .
 const int CYCLES_PER_SCREEN_REFRESH = CPU_HZ / SCREEN_FPS;
 
@@ -50,7 +50,7 @@ int main(int argc, char** args)
     chip8.load_ROM("ROMs/Astro Dodge [Revival Studios, 2008].ch8");
     
     Device device(chip8.get_display(), chip8.get_input());
-    device.set_chip8_internals(chip8.get_reg_ptr(), chip8.get_mem_ptr());
+    device.set_chip8_internals(chip8.get_reg_ptr(), chip8.get_mem_ptr(), chip8.get_instruction_ptr());
 
     while(!WindowShouldClose())
     {

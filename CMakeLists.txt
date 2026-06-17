@@ -29,7 +29,6 @@ add_executable(chip8
     src/Chip8.cpp
     src/Device.cpp
     src/Seg16.cpp
-    src/DrawingUtility.cpp
 )
 
 #target_link_libraries(chip8 PRIVATE SDL3_mixer::SDL3_mixer SDL3::SDL3)

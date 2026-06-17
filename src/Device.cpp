@@ -1,19 +1,20 @@
 #include "Device.h"
 #include "Seg16.h"
 #include "raylib.h"
-#include "DrawingUtility.h"
 #include <stdexcept>
 #include <iterator>
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <iomanip>
+
 
 Device::Device(std::vector<uint8_t>& draw_buffer_in, std::vector<uint8_t>& inputs_in) 
-                : draw_buffer(draw_buffer_in), inputs(inputs_in), intensity(64*32), reg_ptr(nullptr), disp_range_start(0), text_disp_range(4), tot_num_lines(256)
+                : draw_buffer(draw_buffer_in), inputs(inputs_in), intensity(64*32), reg_ptr(nullptr), disp_range_start(0), text_disp_range(20), tot_num_lines(256)
 {
     // game window
     InitWindow(1920, 1080, "Game Window");
-    SetTargetFPS(60);
+    SetTargetFPS(1);
 
     //device screen
     start_im = GenImageColor(64,32, BLACK);
@@ -28,6 +29,12 @@ Device::Device(std::vector<uint8_t>& draw_buffer_in, std::vector<uint8_t>& input
 
     //memory display
     text_lines.resize(text_disp_range);
+
+    //disassembly display
+    max_lines = 20;
+    dis_text_lines.resize(max_lines);
+    head = 0;
+    lines_filled = 0;
 
     //16-segment display
     seg_full_image = LoadImage("assets/16_seg_sprites.png");
@@ -64,21 +71,42 @@ Device::~Device()
     CloseWindow();
 }
 
-void _fetch_memory_lines(std::vector<uint8_t>* mem_ptr, std::vector<std::string>& text_lines, int disp_range_start, int text_disp_range)
+void Device::_fetch_memory_lines(std::vector<uint8_t>* mem_ptr, std::vector<std::string>& text_lines, int disp_range_start, int text_disp_range)
 {
     //fetch and format memory data for memory display. Directly modifies text_lines
     
+    int disp_range_start_ind = disp_range_start*16;
     for(int i = 0; i < text_disp_range; i++)
     {
         std::stringstream line;
-        int line_start_address = disp_range_start + (i*16);
-        line << std::hex << line_start_address << "||"; 
+        int line_start_address = disp_range_start_ind + (i*16);
+        line << "0x" << std::uppercase << std::hex << std::setw(3) << std::setfill('0') << line_start_address << " || "; 
         for(int offset = 0; offset < 16; offset++)
         {
-            line << std::hex << (*mem_ptr)[disp_range_start + offset + i*16] << " ";
+            line << std::hex << std::setw(2) << std::setfill('0') << (int)(*mem_ptr)[line_start_address + offset] << " ";
         }
 
         text_lines[i] =  line.str();
+    }
+
+}
+
+void Device::_update_dissasembly_lines()
+{
+    /*
+    Update head and insert new line into text container for disassembly display.
+    The disassemly display is set up as a circular buffer.
+    */
+
+    dis_text_lines[head] = (*instruction_ptr).str();
+
+    head = (head + 1) % max_lines;
+
+    lines_filled += 1;
+
+    if(lines_filled > max_lines)
+    {
+        lines_filled = max_lines;
     }
 
 }
@@ -107,7 +135,7 @@ void Device::update_screen()
 
     //build memory display text
     
-    disp_range_start += (int)(GetMouseWheelMove())*16; // multiply by 16 because 16 bytes displayed per line.
+    disp_range_start -= (int)(GetMouseWheelMove()); // starting line number.
 
     if(disp_range_start < 0)
     {
@@ -117,8 +145,9 @@ void Device::update_screen()
     {
         disp_range_start = tot_num_lines - text_disp_range;
     }
-    std::cout << disp_range_start << std::endl;
+
     _fetch_memory_lines(memory_ptr, text_lines, disp_range_start, text_disp_range);
+    _update_dissasembly_lines();
 
     //update screen texture
     UpdateTexture(screen, screen_pixels);
@@ -140,14 +169,26 @@ void Device::update_screen()
         EndBlendMode();
 
         //draw memory screen
-        int ypos = 0;
-        for(int i = disp_range_start; i < (disp_range_start + text_disp_range); i++)
+        int mem_ypos = 0;
+        for(int i = 0; i < text_disp_range; i++)
         {
-            ypos += 30;
-            DrawText(text_lines[i].c_str(), 0, ypos, 30, BLACK);        
+            mem_ypos += 30;
+            //DrawText(text_lines[i].c_str(), 0, mem_ypos, 30, BLACK);        
         }
-        
 
+        //draw disassembly lines
+        int dis_ypos = 200;
+        int count = 0;
+        int ind = (head - 1 + max_lines) % max_lines;
+        while(count < lines_filled)
+        {
+            
+            DrawText(dis_text_lines[ind].c_str(), 500, dis_ypos, 30, BLACK);
+            count++;
+            ind = (ind - 1 + max_lines) % max_lines;
+            dis_ypos += 30;
+        }
+    
     EndDrawing();
 }
 void Device::update_inputs()
@@ -169,9 +210,12 @@ void Device::update_inputs()
     inputs[14] = IsKeyDown(KEY_F);
     inputs[15] = IsKeyDown(KEY_V);
 }
-void Device::set_chip8_internals(std::vector<uint8_t>* reg_ptr_in, std::vector<uint8_t>* memory_in)
+void Device::set_chip8_internals(std::vector<uint8_t>* reg_ptr_in, std::vector<uint8_t>* memory_in, std::stringstream* instruction_in)
 {
     reg_ptr = reg_ptr_in;
+    memory_ptr = memory_in;
+    instruction_ptr = instruction_in;
+
 }
 
 
