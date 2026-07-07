@@ -649,6 +649,7 @@ uint8_t& Chip8::get_sound_timer()
 {
     return sound_timer;
 }
+//output to readout device
 std::vector<uint8_t>* Chip8::get_reg_ptr()
 {
     return &reg;
@@ -660,4 +661,16 @@ std::vector<uint8_t>* Chip8::get_mem_ptr()
 std::stringstream* Chip8::get_instruction_ptr()
 {
     return &instruction_ss;
+}
+uint16_t* Chip8::get_opcode()
+{
+    return &opcode;
+}
+uint16_t* Chip8::get_indreg()
+{
+    return &indreg;
+}
+uint16_t* Chip8::get_pc()
+{
+    return &pc;
 }

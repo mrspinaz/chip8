@@ -6,12 +6,16 @@
 
 
 
-const int CPU_HZ = 1; //CPU clock speed. Set equal to SCREEN_FPS to sync with screen refresh rate.
-const int SCREEN_FPS = 1;
+const int CPU_HZ = 3; //CPU clock speed. Set equal to SCREEN_FPS to sync with screen refresh rate.
+const int SCREEN_FPS = 3;
 const int MSPF = 1000 / SCREEN_FPS; // milliseconds per frame. .
 const int CYCLES_PER_SCREEN_REFRESH = CPU_HZ / SCREEN_FPS;
 
 const int STARTUP_TIME = 2000; // time to display startup screen (ms)
+
+// need to make system that system that says if CYCLES_PER_SCREEN_REFRESH < 1 then use 
+// a different variabled called REFRESHES_PER_SCREEN_CYCLE 
+
 
 /*
 void startup_seq(Chip8& chip, Screen& screen)
@@ -45,12 +49,11 @@ void startup_seq(Chip8& chip, Screen& screen)
 
 int main(int argc, char** args)
 {
-
     Chip8 chip8;
     chip8.load_ROM("ROMs/Astro Dodge [Revival Studios, 2008].ch8");
     
-    Device device(chip8.get_display(), chip8.get_input());
-    device.set_chip8_internals(chip8.get_reg_ptr(), chip8.get_mem_ptr(), chip8.get_instruction_ptr());
+    Device device(chip8.get_display(), chip8.get_input(), SCREEN_FPS);
+    device.set_chip8_internals(chip8.get_reg_ptr(), chip8.get_mem_ptr(), chip8.get_instruction_ptr(), chip8.get_opcode(), chip8.get_indreg(), chip8.get_pc());
 
     while(!WindowShouldClose())
     {

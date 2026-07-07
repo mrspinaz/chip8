@@ -9,12 +9,13 @@
 #include <iomanip>
 
 
-Device::Device(std::vector<uint8_t>& draw_buffer_in, std::vector<uint8_t>& inputs_in) 
-                : draw_buffer(draw_buffer_in), inputs(inputs_in), intensity(64*32), reg_ptr(nullptr), disp_range_start(0), text_disp_range(20), tot_num_lines(256)
+Device::Device(std::vector<uint8_t>& draw_buffer_in, std::vector<uint8_t>& inputs_in, int FPS) 
+                : draw_buffer(draw_buffer_in), inputs(inputs_in), intensity(64*32), reg_ptr(nullptr), disp_range_start(0), tot_num_lines(256), 
+                  seg16_a_vec(16), seg16_b_vec(16), seg16_indreg_vec(4), seg16_pc_vec(4)
 {
     // game window
     InitWindow(1920, 1080, "Game Window");
-    SetTargetFPS(1);
+    SetTargetFPS(FPS);
 
     //device screen
     start_im = GenImageColor(64,32, BLACK);
@@ -28,21 +29,32 @@ Device::Device(std::vector<uint8_t>& draw_buffer_in, std::vector<uint8_t>& input
     rise = 0.5;
 
     //memory display
+    mem_font_size = 15.5;
+    text_disp_range = 11;
+    mem_line_spacing = 15;
+    mem_color = (Color){170, 170, 170, 150};
+    mem_font = LoadFontEx("assets/FSEX302.ttf", mem_font_size, nullptr, 0);
     text_lines.resize(text_disp_range);
+    mem_header = "OFFSET   HEX                        KYT-265 MONITOR v1.0";
+    mem_divider = "--------------------------------------------------------";
 
     //disassembly display
-    max_lines = 20;
+    dis_font_size = 17;
+    max_lines = 24;
+    dis_line_spacing = 15;
+    dis_font = LoadFontEx("assets/FSEX302.ttf", dis_font_size, nullptr, 0);
     dis_text_lines.resize(max_lines);
     head = 0;
     lines_filled = 0;
+    dis_header = " ---- TRACE / DISASM ----";
 
     //16-segment display
-    seg_full_image = LoadImage("assets/16_seg_sprites.png");
+    seg_full_image = LoadImage("assets/16_seg_atlas.png");
     seg_full_texture = LoadTextureFromImage(seg_full_image);
     UnloadImage(seg_full_image);
 
     //background device
-    background_image = LoadImage("assets/16 seg test.png");
+    background_image = LoadImage("assets/background.png");
     background_texture = LoadTextureFromImage(background_image);
     UnloadImage(background_image);
 
@@ -53,12 +65,54 @@ Device::Device(std::vector<uint8_t>& draw_buffer_in, std::vector<uint8_t>& input
 
     //setup assets
 
-    // Set up 16 Segment cutout template
-    Vector2 loc_a = {1218.0f,40.0f};
-    Vector2 loc_b = {1253.0f, 40.0f};
-    float scale_factor = 0.08;
-    test_16a = Seg16(seg_full_texture.width, seg_full_texture.height, scale_factor, loc_a);
-    test_16b = Seg16(seg_full_texture.width, seg_full_texture.height, scale_factor, loc_b);
+    // Set up 16 Segment cutout templates
+    float scale_factor = 0.055;
+    int col_count = 0;
+    float horiz_displacement = 0;
+    float vert_displacement = 0;
+    for(int i = 0; i < 16; i++)
+    {
+        Vector2 loc_0a = {1357.0f + horiz_displacement , 146.0f + vert_displacement};
+        Vector2 loc_0b = {1357.0f+26.0f + horiz_displacement, 146.0f + vert_displacement};
+
+        seg16_a_vec[i] = Seg16(seg_full_texture.width, seg_full_texture.height, scale_factor, loc_0a);
+        seg16_b_vec[i] = Seg16(seg_full_texture.width, seg_full_texture.height, scale_factor, loc_0b);
+
+        horiz_displacement += 107.5; 
+
+        col_count += 1;
+        if(col_count % 4 == 0)
+        {
+            vert_displacement += 71.5;
+            horiz_displacement = 0;
+        }
+    }
+
+    float indreg_horiz_displacement = 0.0;
+    for(int j = 0; j < 4; j++)
+    {
+        Vector2 loc_indreg = {1629.0f + indreg_horiz_displacement, 70.0f};
+        Vector2 loc_pc = {1476.0f + indreg_horiz_displacement, 70.0f};
+
+        seg16_indreg_vec[j] = Seg16(seg_full_texture.width, seg_full_texture.height, scale_factor, loc_indreg);
+        seg16_pc_vec[j] = Seg16(seg_full_texture.width, seg_full_texture.height, scale_factor, loc_pc);
+
+        indreg_horiz_displacement += 25.5;
+    }
+
+
+    /*
+    Vector2 loc_1a = {1465.0f, 146.0f};
+    Vector2 loc_1b = {1465.0f + 26.0f, 146.0f};
+    seg_1a = Seg16(seg_full_texture.width, seg_full_texture.height, scale_factor, loc_1a);
+    seg_1b = Seg16(seg_full_texture.width, seg_full_texture.height, scale_factor, loc_1b);
+
+    Vector2 loc_4a = {1357.0f,217.0f};
+    Vector2 loc_4b = {1357.0f + 26.0f,217.0f};
+    seg_4a = Seg16(seg_full_texture.width, seg_full_texture.height, scale_factor, loc_4a);
+    seg_4b = Seg16(seg_full_texture.width, seg_full_texture.height, scale_factor, loc_4b);
+    */
+
 
 }
 
@@ -68,12 +122,13 @@ Device::~Device()
     UnloadTexture(background_texture);
     UnloadTexture(glass_texture);
     UnloadTexture(seg_full_texture);
+    UnloadFont(mem_font);
     CloseWindow();
 }
 
 void Device::_fetch_memory_lines(std::vector<uint8_t>* mem_ptr, std::vector<std::string>& text_lines, int disp_range_start, int text_disp_range)
 {
-    //fetch and format memory data for memory display. Directly modifies text_lines
+    //fetch and format memory data for memory display. 
     
     int disp_range_start_ind = disp_range_start*16;
     for(int i = 0; i < text_disp_range; i++)
@@ -98,7 +153,10 @@ void Device::_update_dissasembly_lines()
     The disassemly display is set up as a circular buffer.
     */
 
-    dis_text_lines[head] = (*instruction_ptr).str();
+    std::stringstream stream;
+    stream << "0x" << std::uppercase << std::hex << std::setw(4) << std::setfill('0') << *opcode_ptr;
+    std::string divider = " -> ";
+    dis_text_lines[head] = stream.str() + divider + (*instruction_ptr).str();
 
     head = (head + 1) % max_lines;
 
@@ -112,7 +170,8 @@ void Device::_update_dissasembly_lines()
 }
 
 void Device::update_screen()
-{
+{   
+    //update game screen buffer
     for (int px = 0; px < 64*32; px++) 
     {
 
@@ -129,12 +188,8 @@ void Device::update_screen()
      
     }
 
-    // retreive chip8 internals
-    uint8_t num1 = ((*reg_ptr)[1] & 0xF0 ) >> 4;
-    uint8_t num2 = (*reg_ptr)[1] & 0x0F;
 
     //build memory display text
-    
     disp_range_start -= (int)(GetMouseWheelMove()); // starting line number.
 
     if(disp_range_start < 0)
@@ -161,33 +216,52 @@ void Device::update_screen()
             //draw chip8 screen
             DrawTexturePro(screen, source_rec, dest_rec,(Vector2){0,0},0.0f, WHITE);
 
-            //draw registers  
-            DrawTexturePro(seg_full_texture, test_16a.disp_char_rect(num1), test_16a.get_dest_rect(), Vector2 {0.0f, 0.0f}, 0.0f, WHITE);
-            DrawTexturePro(seg_full_texture, test_16b.disp_char_rect(num2), test_16b.get_dest_rect(), Vector2 {0.0f, 0.0f}, 0.0f, WHITE);
-            
-            DrawTexture(glass_texture, 0, 0, WHITE);
+            //draw registers 
+            for(int i = 0; i < 16; i++)
+            {
+                DrawTexturePro(seg_full_texture, seg16_a_vec[i].disp_char_rect(((*reg_ptr)[i] & 0xF0 ) >> 4), seg16_a_vec[i].get_dest_rect(), Vector2 {0.0f, 0.0f}, 0.0f, WHITE);
+                DrawTexturePro(seg_full_texture, seg16_b_vec[i].disp_char_rect((*reg_ptr)[i] & 0x0F), seg16_b_vec[i].get_dest_rect(), Vector2 {0.0f, 0.0f}, 0.0f, WHITE);
+            }
+
+                DrawTexturePro(seg_full_texture, seg16_indreg_vec[0].disp_char_rect((*indreg_ptr & 0xF000 ) >> 12), seg16_indreg_vec[0].get_dest_rect(), Vector2 {0.0f, 0.0f}, 0.0f, WHITE);
+                DrawTexturePro(seg_full_texture, seg16_indreg_vec[1].disp_char_rect((*indreg_ptr & 0x0F00 ) >> 8), seg16_indreg_vec[1].get_dest_rect(), Vector2 {0.0f, 0.0f}, 0.0f, WHITE);
+                DrawTexturePro(seg_full_texture, seg16_indreg_vec[2].disp_char_rect((*indreg_ptr & 0x00F0 ) >> 4), seg16_indreg_vec[2].get_dest_rect(), Vector2 {0.0f, 0.0f}, 0.0f, WHITE);
+                DrawTexturePro(seg_full_texture, seg16_indreg_vec[3].disp_char_rect((*indreg_ptr & 0x000F )), seg16_indreg_vec[3].get_dest_rect(), Vector2 {0.0f, 0.0f}, 0.0f, WHITE);
+
+                DrawTexturePro(seg_full_texture, seg16_pc_vec[0].disp_char_rect((*pc_ptr & 0xF000 ) >> 12), seg16_pc_vec[0].get_dest_rect(), Vector2 {0.0f, 0.0f}, 0.0f, WHITE);
+                DrawTexturePro(seg_full_texture, seg16_pc_vec[1].disp_char_rect((*pc_ptr & 0x0F00 ) >> 8), seg16_pc_vec[1].get_dest_rect(), Vector2 {0.0f, 0.0f}, 0.0f, WHITE);
+                DrawTexturePro(seg_full_texture, seg16_pc_vec[2].disp_char_rect((*pc_ptr & 0x00F0 ) >> 4), seg16_pc_vec[2].get_dest_rect(), Vector2 {0.0f, 0.0f}, 0.0f, WHITE);
+                DrawTexturePro(seg_full_texture, seg16_pc_vec[3].disp_char_rect((*pc_ptr & 0x000F )), seg16_pc_vec[3].get_dest_rect(), Vector2 {0.0f, 0.0f}, 0.0f, WHITE);
+
+            //DrawTexture(glass_texture, 0, 0, WHITE);
         EndBlendMode();
 
         //draw memory screen
-        int mem_ypos = 0;
+        float mem_ypos = 482;
+        float mem_xpos = 937;
+        DrawTextEx(mem_font, mem_header.c_str(), (Vector2){mem_xpos, mem_ypos-10}, mem_font_size, 1, mem_color);
+         DrawTextEx(mem_font, mem_divider.c_str(), (Vector2){mem_xpos, mem_ypos}, mem_font_size, 1, mem_color);
         for(int i = 0; i < text_disp_range; i++)
         {
-            mem_ypos += 30;
-            //DrawText(text_lines[i].c_str(), 0, mem_ypos, 30, BLACK);        
+            mem_ypos += mem_line_spacing;
+            DrawTextEx(mem_font, text_lines[i].c_str(), (Vector2){mem_xpos, mem_ypos}, mem_font_size, 1, mem_color);        
         }
 
         //draw disassembly lines
-        int dis_ypos = 200;
+        float dis_ypos = 492;
+        float dis_xpos = 1493;
+        DrawTextEx(dis_font, dis_header.c_str(), (Vector2){dis_xpos, dis_ypos-20}, dis_font_size, 1, mem_color);
         int count = 0;
         int ind = (head - 1 + max_lines) % max_lines;
         while(count < lines_filled)
         {
             
-            DrawText(dis_text_lines[ind].c_str(), 500, dis_ypos, 30, BLACK);
+            DrawTextEx(dis_font, dis_text_lines[ind].c_str(), (Vector2){dis_xpos+2, dis_ypos}, dis_font_size, 1, mem_color);
             count++;
             ind = (ind - 1 + max_lines) % max_lines;
-            dis_ypos += 30;
+            dis_ypos += dis_line_spacing;
         }
+        
     
     EndDrawing();
 }
@@ -210,11 +284,14 @@ void Device::update_inputs()
     inputs[14] = IsKeyDown(KEY_F);
     inputs[15] = IsKeyDown(KEY_V);
 }
-void Device::set_chip8_internals(std::vector<uint8_t>* reg_ptr_in, std::vector<uint8_t>* memory_in, std::stringstream* instruction_in)
+void Device::set_chip8_internals(std::vector<uint8_t>* reg_ptr_in, std::vector<uint8_t>* memory_in, std::stringstream* instruction_in, uint16_t* opcode_in, uint16_t* indreg_in, uint16_t* pc_in)
 {
     reg_ptr = reg_ptr_in;
     memory_ptr = memory_in;
     instruction_ptr = instruction_in;
+    opcode_ptr = opcode_in;
+    indreg_ptr = indreg_in;
+    pc_ptr = pc_in;
 
 }
 

@@ -103,5 +103,8 @@ class Chip8
     std::vector<uint8_t>* get_reg_ptr();
     std::vector<uint8_t>* get_mem_ptr();
     std::stringstream* get_instruction_ptr();
+    uint16_t* get_opcode();
+    uint16_t* get_indreg();
+    uint16_t* get_pc();
     
 };

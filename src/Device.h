@@ -23,25 +23,37 @@ class Device
     std::vector<uint8_t>& draw_buffer;
     std::vector<uint8_t>& inputs; // key inputs
 
-    //Memory Display 
+    //Memory Display
+    Color mem_color; // custom text color
+    Font mem_font; // font container
+    int mem_line_spacing; // vertical spacing between printed lines.
+    int mem_font_size; // font size 
     int disp_range_start; // value controlled by scroll wheel.
     int text_disp_range; // number of lines (16 bytes each) to display for memory readout.
     int tot_num_lines; // Hardcoded to 256, displaying 16 bytes per line, 4096 bytes total in memory.
     std::vector<std::string> text_lines;
+    std::string mem_header;
+    std::string mem_divider;
 
     //disassembly display
+    Font dis_font; // font container
+    int dis_font_size; // font size
+    int dis_line_spacing; // vertical spacing between printed lines.
     std::vector<std::string> dis_text_lines;
-    int max_lines;
+    int max_lines; // number of disassembly lines to display on screen
     int head; //head of display, updated each iter.
     int lines_filled; //tracks how many entries are in dis_text_lines;
+    std::string dis_header;
 
     //16-Seg Display
     Image seg_full_image; // Image atlas
     Texture2D seg_full_texture; // Texture atlas
     float cutout_width_16seg;
     float cutout_height_16seg;
-    Seg16 test_16a; // test 16-seg display 1
-    Seg16 test_16b; // test 16-seg display 2
+    std::vector<Seg16> seg16_a_vec;
+    std::vector<Seg16> seg16_b_vec;
+    std::vector<Seg16> seg16_indreg_vec;
+    std::vector<Seg16> seg16_pc_vec;
 
     //Rendered Device
     Texture2D background_texture;
@@ -53,17 +65,20 @@ class Device
     std::vector<uint8_t>* reg_ptr; // pointer to reg for 16-seg display
     std::vector<uint8_t>* memory_ptr; // pointer to memory for memory display
     std::stringstream* instruction_ptr; // pointer to instruction_ss for disassembly display
+    uint16_t* opcode_ptr; // pointer to opcode for disassembly display.
+    uint16_t* indreg_ptr;
+    uint16_t* pc_ptr;
 
     private:
     void _fetch_memory_lines(std::vector<uint8_t>* mem_ptr, std::vector<std::string>& text_lines, int disp_range_start, int text_disp_range);
     void _update_dissasembly_lines();
 
     public:
-    Device(std::vector<uint8_t>& draw_buffer_in, std::vector<uint8_t>& inputs_in);
+    Device(std::vector<uint8_t>& draw_buffer_in, std::vector<uint8_t>& inputs_in, int FPS);
     ~Device();
     void update_screen();
     void update_inputs();  
-    void set_chip8_internals(std::vector<uint8_t>* reg_ptr_in, std::vector<uint8_t>* memory_in, std::stringstream* instruction_in);
+    void set_chip8_internals(std::vector<uint8_t>* reg_ptr_in, std::vector<uint8_t>* memory_in, std::stringstream* instruction_in, u_int16_t* opcode_in, u_int16_t* indreg_in, uint16_t* pc_in);
 };
 
 /*
